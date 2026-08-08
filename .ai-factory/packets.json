@@ -1,0 +1,633 @@
+[
+  {
+    "id": "0001",
+    "title": "전체 타입 정의 (types.ts)",
+    "epic": "Epic 1. Types",
+    "task": {
+      "description": "SPEC의 모든 엔티티(Transaction, SubscriptionItem, WeeklyReport, SavingChallenge, UserSettings)와 Category union, 외부 AI API 요청/응답 타입(WeeklyReportRequest/Response, BenchmarkRequest/Response, ApiError), 저장 유틸 반환 타입({ok:true,...}|{ok:false,error}), 페이지네이션 Paged<T>={items,total,page}, RouteState를 순수 타입으로 정의한다. 런타임 코드 0줄. 모든 엔티티에 createdAt/updatedAt 포함하며 싱글턴(UserSettings) id 생략 사유를 주석으로 명시한다.",
+      "acceptance_criteria": [
+        "tsc --noEmit 통과, 런타임 코드 0줄",
+        "모든 엔티티에 createdAt/updatedAt(및 싱글턴 예외 주석) 포함",
+        "RouteState, Paged<T>, ApiError export됨"
+      ]
+    },
+    "covers": [
+      "F1",
+      "전 엔티티 타입 기반"
+    ],
+    "files": [
+      "src/lib/types.ts"
+    ],
+    "definition_of_done": [
+      "export된 타입만 존재하고 import 시 순환참조 없음",
+      "Category 10종 union 정의"
+    ],
+    "depends_on": [],
+    "db_schema": "interface Transaction{id;amount;category;merchant;memo;spentAt;source;createdAt;updatedAt} + SubscriptionItem/WeeklyReport/SavingChallenge/UserSettings + Category union",
+    "api_contract": "타입 선언만: WeeklyReportRequest/Response, BenchmarkRequest/Response, ApiError",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0002",
+    "title": "저장 코어 유틸 (safe JSON / 쿼터 방어)",
+    "epic": "Epic 2. Data Layer",
+    "task": {
+      "description": "타입 안전 safeGet<T>(key, fallback)와 safeSet(key,value):{ok:boolean;error?:'storage_full'}를 구현한다. JSON 파싱 실패 시 try/catch로 fallback 반환하되 console.error를 출력하지 않는다. QuotaExceededError 캐치 시 이전 값으로 롤백 후 {ok:false,error:'storage_full'} 반환. spendlens.transactions/subscriptions/reports/challenges/settings 키 상수를 정의한다.",
+      "acceptance_criteria": [
+        "손상값 '\"{broken' 주입 시 fallback 반환하고 console.error 미출력",
+        "쿼터 초과 시 throw 없이 {ok:false,error:'storage_full'} 반환",
+        "spendlens.* 키 상수 5종 export"
+      ]
+    },
+    "covers": [
+      "F1-AC4",
+      "F1-AC5"
+    ],
+    "files": [
+      "src/lib/storage/core.ts"
+    ],
+    "definition_of_done": [
+      "safeGet/safeSet가 제네릭 타입 안전",
+      "모든 repo가 이 코어를 경유하도록 export"
+    ],
+    "depends_on": [],
+    "db_schema": "localStorage 키 상수: spendlens.transactions/subscriptions/reports/challenges/settings",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0003",
+    "title": "Transaction repo (CRUD·검증·페이지네이션·집계)",
+    "epic": "Epic 2. Data Layer",
+    "task": {
+      "description": "addTransaction()은 id/createdAt/updatedAt 자동 채움, amount>0 검증(위반 시 {ok:false,error:'invalid_amount'}), 1,500건/12개월 상한 초과 시 spentAt 오래된 순 제거. getTransactions() 무인자 오버로드(전체)와 getTransactions({page,pageSize})(Paged<T> 반환, page<1→1, pageSize≤0→50, 범위초과 page→items:[]). getTransactionById, deleteTransaction, getCategoryTotals()(amount 내림차순)을 제공한다.",
+      "acceptance_criteria": [
+        "120건에서 {page:1,pageSize:50}→items 50/total 120, {page:3}→items 20, {page:0}→page 1 보정",
+        "getCategoryTotals 결과가 금액 내림차순",
+        "amount 0/음수 addTransaction 거부"
+      ]
+    },
+    "covers": [
+      "F1-AC1",
+      "F1-AC2",
+      "F1-AC3",
+      "F1-AC6",
+      "F1-AC7",
+      "F1-AC8"
+    ],
+    "files": [
+      "src/lib/storage/transactions.ts"
+    ],
+    "definition_of_done": [
+      "Paged<T> 반환 계약 준수",
+      "상한 초과 시 오래된 순 제거"
+    ],
+    "depends_on": [
+      "0002"
+    ],
+    "db_schema": "Transaction[] @ spendlens.transactions",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0004",
+    "title": "SMS 파서 유틸 (원문 미저장)",
+    "epic": "Epic 2. Data Layer",
+    "task": {
+      "description": "카드사 결제 SMS 텍스트를 {amount,merchant,category,spentAt}로 추출하는 정규식 파서 parseSms(text):Partial<Transaction>|null을 구현한다. 금액 미검출 시 null 반환. 가맹점→카테고리 매핑 테이블(예: 스타벅스→카페, 배달의민족→배달)을 포함한다. 원문 문자열은 반환 객체와 저장 어디에도 포함하지 않는다.",
+      "acceptance_criteria": [
+        "'[Web발신] 신한카드 12,000원 승인 스타벅스 08/09 12:30'→{amount:12000,merchant:'스타벅스',category:'카페',spentAt 포함}",
+        "'안녕하세요 광고입니다'→null",
+        "반환 객체에 원문 문자열 필드 없음"
+      ]
+    },
+    "covers": [
+      "F2-AC1",
+      "F2-AC5"
+    ],
+    "files": [
+      "src/lib/sms/parser.ts"
+    ],
+    "definition_of_done": [
+      "금액/가맹점/일시 정규식 추출",
+      "카테고리 매핑 테이블 포함"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0005",
+    "title": "구독 감지 (파생 재계산)",
+    "epic": "Epic 2. Data Layer",
+    "task": {
+      "description": "detectSubscriptions()은 category==='구독' Transaction을 merchant별 그룹핑하여 최근 3개월 중 2개월↑·금액 편차 ±10% 이내면 SubscriptionItem을 생성한다. id는 sourceTxIds의 안정적 해시로 동일 구독 재계산 시 불변, isDuplicateSuspect는 동일 category 2건↑로 재판정, 근거 거래 전부 삭제 시 결과에서 소멸. 손상/미달 시 빈 배열 반환하며 spendlens.subscriptions에 저장한다.",
+      "acceptance_criteria": [
+        "넷플릭스 3개월 반복→SubscriptionItem 1건, sourceTxIds 채워짐, 재호출 시 id 동일",
+        "근거 거래 전부 삭제 후 재감지 시 소멸",
+        "손상 데이터→빈 배열, console.error 미출력"
+      ]
+    },
+    "covers": [
+      "F9-AC1",
+      "F9-AC5",
+      "F9-AC6"
+    ],
+    "files": [
+      "src/lib/storage/subscriptions.ts"
+    ],
+    "definition_of_done": [
+      "안정적 해시 id 불변",
+      "Transaction 뮤테이션마다 전체 재감지"
+    ],
+    "depends_on": [
+      "0003"
+    ],
+    "db_schema": "SubscriptionItem[] @ spendlens.subscriptions",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0006",
+    "title": "SavingChallenge repo (파생 currentSaved)",
+    "epic": "Epic 2. Data Layer",
+    "task": {
+      "description": "addChallenge()은 monthKey=이번 달·status 'active'로 생성, targetAmount>0 검증, 동일 월·카테고리 active 중복 방지. getChallenges/getChallengeById 제공. computeChallenge(challenge)는 Transaction에서 전월 동일 카테고리 합계−이번 달 합계(음수 0)로 currentSaved를 라이브 재계산하고, currentSaved>=targetAmount면 status를 'achieved'로 전이하며 updatedAt을 갱신한다.",
+      "acceptance_criteria": [
+        "배달 전월 120,000·이번 달 80,000→currentSaved 40000",
+        "targetAmount 0/음수 거부, 동일 카테고리 재생성 차단",
+        "달성 시 status 'achieved'로 전이"
+      ]
+    },
+    "covers": [
+      "F6-AC1",
+      "F6-AC2",
+      "F6-AC3",
+      "F6-AC4",
+      "F6-AC5"
+    ],
+    "files": [
+      "src/lib/storage/challenges.ts"
+    ],
+    "definition_of_done": [
+      "currentSaved 저장 FK 없이 읽기 시 재계산",
+      "중복 active 방지"
+    ],
+    "depends_on": [
+      "0003"
+    ],
+    "db_schema": "SavingChallenge[] @ spendlens.challenges",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0007",
+    "title": "Settings repo + 프로모션/보상 헬퍼",
+    "epic": "Epic 2. Data Layer",
+    "task": {
+      "description": "getSettings()은 기본값으로 싱글턴 초기화, updateSettings(patch)는 updatedAt 갱신하며 isPremium/aiNoticeAcknowledged/benchmarkAgeBand/benchmarkIncomeBand를 관리한다. grantPromotion({promotionCode,amount})는 amount<=5000 검증 후에만 '@apps-in-toss/web-framework'의 grantPromotionReward를 호출하고 초과 시 호출을 차단한다.",
+      "acceptance_criteria": [
+        "settings 저장/조회 왕복 성공, updateSettings 시 updatedAt 갱신",
+        "amount:6000→grantPromotionReward 미호출",
+        "amount:5000→grantPromotionReward 호출"
+      ]
+    },
+    "covers": [
+      "F7-AC4",
+      "F7-AC6",
+      "AC-G9"
+    ],
+    "files": [
+      "src/lib/storage/settings.ts",
+      "src/lib/promotion.ts"
+    ],
+    "definition_of_done": [
+      "싱글턴 설정 객체 유지",
+      "프로모션 5,000원 상한 강제"
+    ],
+    "depends_on": [
+      "0002"
+    ],
+    "db_schema": "UserSettings @ spendlens.settings (싱글턴)",
+    "api_contract": "grantPromotionReward({promotionCode,amount}) from '@apps-in-toss/web-framework'",
+    "dependencies": [
+      "@apps-in-toss/web-framework"
+    ],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0008",
+    "title": "리포트 캐시 repo + AI API 클라이언트 (무인증·무상태)",
+    "epic": "Epic 2. Data Layer",
+    "task": {
+      "description": "spendlens.reports 캐시 repo(getCachedReport(key)/saveReport, 최근 12건 유지, 불변 스냅샷)를 구현한다. postWeeklyReport(req)/postBenchmark(req) fetch 클라이언트는 Content-Type: application/json만 부착하고 Authorization·기기/사용자 식별 헤더·쿠키를 미부착, body는 익명 집계만 전송한다. 에러(400/429/500/503)를 통일 {error} 파싱하고 네트워크 실패 시 throw 아닌 결과 객체를 반환한다.",
+      "acceptance_criteria": [
+        "요청 헤더에 Authorization/식별자 0개, body에 merchant 원문/memo/SMS 원문 없음",
+        "503 응답을 통일 에러 객체로 반환",
+        "reports 캐시 12건 상한 유지"
+      ]
+    },
+    "covers": [
+      "F4-AC8",
+      "AC-G3",
+      "AC-G12"
+    ],
+    "files": [
+      "src/lib/storage/reports.ts",
+      "src/lib/api/aiClient.ts"
+    ],
+    "definition_of_done": [
+      "식별자 미부착을 코드 레벨에서 강제",
+      "불변 스냅샷 캐시"
+    ],
+    "depends_on": [
+      "0002"
+    ],
+    "db_schema": "WeeklyReport[] @ spendlens.reports (최근 12건)",
+    "api_contract": "POST /api/v1/weekly-report {WeeklyReportRequest}→{WeeklyReportResponse} | POST /api/v1/benchmark {BenchmarkRequest}→{BenchmarkResponse} | errors 400/429/500/503 {error}",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0009",
+    "title": "월간 집계 + 공유 이미지 생성 유틸 (PRD Feature 5)",
+    "epic": "Epic 2. Data Layer",
+    "task": {
+      "description": "getMonthlyAggregate(monthKey?)은 해당 월 Transaction에서 총지출·카테고리별 합계·전월 대비 증감을 순수 계산해 postWeeklyReport의 월 범위 익명 요청 body로 변환한다. buildShareImage(report,aggregate):Blob는 canvas로 월간 진단 이미지를 렌더하고 shareMonthlyReport()로 토스 앱 내 공유 시트에 전달한다. 외부 이동 금지에 따라 PDF 대신 앱 내 이미지 공유로 구현하며, 이미지에 'AI가 생성한 결과입니다' 워터마크 포함, 식별자·원문 미포함.",
+      "acceptance_criteria": [
+        "getMonthlyAggregate('2026-07')가 7월 범위만 집계(전월 6월 대비 증감 포함)",
+        "shareMonthlyReport 실행 시 window.open/window.location.href 호출 0건",
+        "지출 0건 월→{total:0,...} 반환(throw 없음), 이미지에 AI 배지 워터마크 포함"
+      ]
+    },
+    "covers": [
+      "F8-AC5",
+      "AC-G4"
+    ],
+    "files": [
+      "src/lib/monthly/aggregate.ts",
+      "src/lib/monthly/share.ts"
+    ],
+    "definition_of_done": [
+      "canvas 이미지 공유 시트만 사용",
+      "식별자·merchant 원문 미포함"
+    ],
+    "depends_on": [
+      "0003",
+      "0008"
+    ],
+    "db_schema": "파생 집계(저장 안 함), 요청은 WeeklyReportRequest 월 범위",
+    "api_contract": "POST /api/v1/weekly-report (월 범위 집계) 재사용",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0010",
+    "title": "홈 대시보드 (`/`)",
+    "epic": "Epic 3. Pages",
+    "task": {
+      "description": "이번 달 총지출 SummaryHero, 카테고리 TOP Chip 스크롤, getCategoryTotals 상위 5개 ListRow, 무료 사용자 하단 AdSlot 배너, FloatingTabBar를 조립한다. 지출 목록은 getTransactions({page,pageSize:50})로 첫 50건 렌더 후 스크롤 시 이어붙이며 total 도달 시 '더 이상 없음' 표시. 로딩 Skeleton, 빈 상태(첫 지출 추가 CTA), 에러(다시 시도) 상태를 방어한다.",
+      "acceptance_criteria": [
+        "3건 합계가 month-total에 표시",
+        "500건 시 첫 렌더 50건, 스크롤 시 이어붙임, total서 '더 이상 없음'",
+        "빈/로딩 상태 렌더, 배너와 목록 비겹침"
+      ]
+    },
+    "covers": [
+      "F3-AC1",
+      "F3-AC2",
+      "F3-AC3"
+    ],
+    "files": [
+      "src/pages/Home.tsx"
+    ],
+    "definition_of_done": [
+      "페이지네이션 무한스크롤 동작",
+      "TDS 여백 덮어쓰기 없음"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: StatusPanel. TDS: Top, SummaryHero, Amount, Spacing, Paragraph, Chip, ListRow, Border, AdSlot, FloatingTabBar. Layout: <Top title='이번 달 지출'/> <SummaryHero label='이번 달 총 지출' value={<Amount value unit='원' typography='t1'/>} caption='지난달보다 12% 덜 썼어요'/> <Spacing size={24}/> Paragraph '카테고리 TOP' + Chip 가로스크롤(식비/카페…) + getCategoryTotals 상위5 ListRow(2RowTypeA, right=Amount) + <Border/> + AdSlot(무료만) + FloatingTabBar. States: Loading=Skeleton 3~4개; Empty=EmptyState '아직 지출 기록이 없어요'+Button '지출 추가하기'; Error=Paragraph '지출을 불러오지 못했어요'+Button '다시 시도'. Interactions: Chip 탭→카테고리 필터, tickWeak 햅틱; 탭 전환 tickWeak."
+  },
+  {
+    "id": "0011",
+    "title": "지출 기록 (`/add`)",
+    "epic": "Epic 3. Pages",
+    "task": {
+      "description": "직접 입력/문자 붙여넣기 Tab, 금액 TextField(검증), 카테고리 Chip 단일선택, 메모 TextField, 하단 고정 저장 버튼을 조립한다. 문자 붙여넣기 시 parseSms로 프리필하고 실패 시 안내+포커스. 빈/0 금액 저장 차단+에러. 저장 성공 시 success 햅틱+Toast '저장했어요'+홈 이동. RouteState prefill 없이 직접 진입해도 크래시 없이 빈 폼 표시.",
+      "acceptance_criteria": [
+        "SMS 분석→프리필, 실패→안내+포커스",
+        "빈/0 금액 저장 차단+help 에러",
+        "저장→Toast+홈 이동, state 없이 진입해도 크래시 없이 빈 폼"
+      ]
+    },
+    "covers": [
+      "F2-AC2",
+      "F2-AC3",
+      "F2-AC4"
+    ],
+    "files": [
+      "src/pages/Add.tsx"
+    ],
+    "definition_of_done": [
+      "amount≤0 저장 차단",
+      "safe area 하단 고정 CTA"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FixedBottomCTA. TDS: Top, TextField, Tab, Chip, Spacing, Paragraph, Button, BottomSheet, Toast. Layout: <Top title='지출 추가'/> <Tab> '직접 입력' | '문자 붙여넣기' </Tab>. mode0: TextField variant='box' label='금액' hasError={amtErr} help '숫자만 입력할 수 있어요' + 카테고리 Chip 10종 + 메모 TextField. mode1: TextField '문자 원문 붙여넣기'→parseSms 미리보기. 하단 고정 div position:fixed bottom:0 paddingBottom:'calc(16px + env(safe-area-inset-bottom))' backgroundColor var(--tds-color-background) 안에 Button variant='fill' size='large' color='primary' '저장하기'. States: 저장 중 Button loading; 파싱 실패 Paragraph color='tertiary' '문자에서 금액을 못 찾았어요. 직접 입력해 주세요'; storage_full Toast '저장 공간이 가득 찼어요'. Interactions: 저장 성공→success 햅틱+Toast '저장했어요'+/ 복귀; Chip 단일선택 tickWeak; amount≤0 저장 차단."
+  },
+  {
+    "id": "0012",
+    "title": "지출 상세 (`/tx/:id`)",
+    "epic": "Epic 3. Pages",
+    "task": {
+      "description": "getTransactionById로 유효 id의 지출 상세(금액/카테고리/가맹점/일시/메모)를 표시하고, 메모/카테고리 수정과 삭제(확인 다이얼로그 후에만 제거+Toast)를 제공한다. 없는 id는 크래시 없이 빈 상태로 렌더한다. AlertDialog 왼쪽 버튼은 '닫기'.",
+      "acceptance_criteria": [
+        "유효 id 상세 표시",
+        "없는 id→빈 상태(크래시 없음)",
+        "삭제 확인 다이얼로그, 확인 시에만 제거+Toast"
+      ]
+    },
+    "covers": [
+      "F3-AC4",
+      "F3-AC5"
+    ],
+    "files": [
+      "src/pages/TransactionDetail.tsx"
+    ],
+    "definition_of_done": [
+      "삭제 확인 다이얼로그 좌측 '닫기'",
+      "없는 id 방어"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: DetailView. TDS: Top, ListRow, Amount, Paragraph, Button, AlertDialog, Toast, Spacing, Border. Layout: <Top title='지출 상세'/> 상단 Amount 강조, ListRow(카테고리/가맹점/일시/메모) 나열, 하단 Button '삭제'(destructive) + '수정'. 삭제 시 AlertDialog(왼쪽 '닫기', 오른쪽 '삭제'). States: 없는 id→EmptyState '내역을 찾을 수 없어요'. Interactions: 삭제 확인 시에만 deleteTransaction+Toast '삭제했어요'+뒤로가기."
+  },
+  {
+    "id": "0013",
+    "title": "AI 주간 리포트 (`/report`)",
+    "epic": "Epic 3. Pages",
+    "task": {
+      "description": "이번 주 categoryTotals/subscriptions/txCount를 postWeeklyReport로 요청해 topWasteCategory/wasteAmount/insights/savingSuggestion을 waste-card로 표시하고 'AI가 생성한 결과입니다' 배지를 상시 노출한다. 무료 사용자는 TossRewardAd 게이트로 광고 시청 후 노출. 3건 미만이면 API 미호출 빈 상태. 503은 Toast 후 화면 유지. RouteState 없이 진입해도 이번 주 기본 계산.",
+      "acceptance_criteria": [
+        "200→waste-card+ai-label 노출",
+        "무료 사용자 광고 시청 후 노출, 3건 미만 빈 상태 API 미호출",
+        "503 Toast 후 화면 유지, state 없이 진입해도 크래시 없이 이번 주 계산"
+      ]
+    },
+    "covers": [
+      "F4-AC1",
+      "F4-AC2",
+      "F4-AC3",
+      "F4-AC4"
+    ],
+    "files": [
+      "src/pages/Report.tsx"
+    ],
+    "definition_of_done": [
+      "TossRewardAd 게이트 결과 화면",
+      "AI 배지 상시"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "POST /api/v1/weekly-report",
+    "dependencies": [],
+    "ui_requirements": "Pattern: StatusPanel + RewardGate. TDS: Top, SummaryHero, Amount, Paragraph, Chip, ListRow, Button, Toast, Skeleton, Border + TossRewardAd. Layout: <Top title='AI 주간 리포트'/>. 무료 사용자: <TossRewardAd slotId={import.meta.env.VITE_TOSS_AD_SLOT_ID}>결과</TossRewardAd>. 결과 카드: topWaste SummaryHero(Amount wasteAmount), insights ListRow 목록(최대5), savingSuggestion Paragraph, 'AI가 생성한 결과입니다' 배지 상시. States: Loading=Skeleton; Empty(3건 미만)=EmptyState '분석할 지출이 부족해요'(API 미호출); Error 503=Toast 'AI가 잠시 쉬고 있어요'. Interactions: '다시 분석' Button→재요청."
+  },
+  {
+    "id": "0014",
+    "title": "또래 벤치마크 (`/benchmark`)",
+    "epic": "Epic 3. Pages",
+    "task": {
+      "description": "프리미엄 사용자는 benchmarkAgeBand/incomeBand+categoryTotals를 postBenchmark로 요청해 comparisons(userAmount/peerAvg/diffPercent)와 aiComment를 benchmark-card로 표시한다. 비프리미엄은 잠금 카드 표시 API 미호출. 기준(밴드) 미설정 시 선택 BottomSheet. 로딩 Skeleton/빈/500 Toast 상태를 각각 렌더한다. AI 배지 노출.",
+      "acceptance_criteria": [
+        "프리미엄 200→benchmark-card",
+        "비프리미엄→잠금 카드 API 미호출",
+        "기준 미설정→BottomSheet, 로딩 Skeleton/빈/500 Toast 각각 렌더"
+      ]
+    },
+    "covers": [
+      "F5-AC1",
+      "F5-AC2",
+      "F5-AC3",
+      "F5-AC4"
+    ],
+    "files": [
+      "src/pages/Benchmark.tsx"
+    ],
+    "definition_of_done": [
+      "프리미엄 분기 API 게이트",
+      "기준 선택 BottomSheet"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "POST /api/v1/benchmark",
+    "dependencies": [],
+    "ui_requirements": "Pattern: StatusPanel + PremiumGate. TDS: Top, ListRow, Amount, Paragraph, Chip, Button, BottomSheet, Skeleton, Toast, Border. Layout: <Top title='또래 벤치마크'/>. 비프리미엄: 잠금 카드(자물쇠 ContentIcon + Paragraph '프리미엄에서 볼 수 있어요' + Button '프리미엄 보기'→/premium state {from:'benchmark'}, API 미호출). 프리미엄: comparisons ListRow(카테고리 top, right=diffPercent %, userAmount vs peerAvg) + aiComment Paragraph + 'AI가 생성한 결과입니다' 배지. 기준 미설정 시 BottomSheet로 ageBand/incomeBand Chip 선택. States: Loading Skeleton; Empty '비교할 데이터가 부족해요'; 500 Toast '다시 시도해 주세요'."
+  },
+  {
+    "id": "0015",
+    "title": "절약 챌린지 목록+상세 (`/challenge`, `/challenge/:id`)",
+    "epic": "Epic 3. Pages",
+    "task": {
+      "description": "챌린지 목록/생성 화면(생성 시 active 목록 추가, 목표액 0/음수 에러, 동일 카테고리 재생성 Toast 차단, 빈 상태)과 상세 화면(computeChallenge로 currentSaved 재계산 saved-hero+진행 바, 달성 시 Badge, 없는 id 빈 상태)을 한 패킷에서 두 컴포넌트로 구현한다.",
+      "acceptance_criteria": [
+        "생성→active 목록 추가, 목표액 0/음수 에러, 동일 카테고리 재생성 Toast 차단",
+        "배달 전월 120,000·이번 달 80,000→saved-hero 40000, 진행 바 80%",
+        "달성 시 Badge, 없는 id→크래시 없이 빈 상태"
+      ]
+    },
+    "covers": [
+      "F6-AC1",
+      "F6-AC2",
+      "F6-AC3",
+      "F6-AC4",
+      "F6-AC5"
+    ],
+    "files": [
+      "src/pages/Challenge.tsx",
+      "src/pages/ChallengeDetail.tsx"
+    ],
+    "definition_of_done": [
+      "목표액 검증+중복 차단",
+      "진행률 라이브 재계산"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: List+Create / DetailView. TDS: Top, ListRow, Amount, Chip, TextField, Button, Badge, Paragraph, BottomSheet, Toast, Spacing, Border. 목록: <Top title='절약 챌린지' right=Button '추가'/> active 챌린지 ListRow(카테고리/진행률) + 생성 BottomSheet(카테고리 Chip, 목표액 TextField hasError). Empty=EmptyState '첫 챌린지를 만들어 보세요'. 상세: SummaryHero saved-hero(Amount currentSaved) + 진행 바(percent) + 달성 시 Badge '달성'. Interactions: 목표액≤0 에러 help, 동일 카테고리 재생성 Toast '이미 진행 중인 챌린지가 있어요', 없는 id→EmptyState."
+  },
+  {
+    "id": "0016",
+    "title": "프리미엄 & 설정 (`/premium`)",
+    "epic": "Epic 3. Pages",
+    "task": {
+      "description": "TossPurchase로 IAP 결제(성공 시 isPremium true+Toast, 이용 중이면 CTA 비활성, 취소 시 변경 없음+Toast)와 설정(benchmarkAgeBand/incomeBand Chip 선택→저장+Toast)을 조립한다. RouteState from 없이 진입해도 정상 렌더. 프로모션 코드 입력 시 grantPromotion 호출(5,000원 상한).",
+      "acceptance_criteria": [
+        "결제 성공→isPremium true+Toast, 이용 중 CTA 비활성",
+        "취소→변경 없음+Toast",
+        "Chip 선택→저장+Toast, state 없이 진입해도 정상"
+      ]
+    },
+    "covers": [
+      "F7-AC1",
+      "F7-AC2",
+      "F7-AC3",
+      "F7-AC4",
+      "F7-AC5"
+    ],
+    "files": [
+      "src/pages/Premium.tsx"
+    ],
+    "definition_of_done": [
+      "TossPurchase 컴포넌트 사용(커스텀 결제 금지)",
+      "설정 저장 왕복"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FixedBottomCTA + Settings. TDS: Top, ListRow, Paragraph, Chip, Switch, Button, Toast, Spacing, Border + TossPurchase. Layout: <Top title='프리미엄'/> 혜택 ListRow 목록(심층 패턴/벤치마크/월간 진단) + <TossPurchase sku={import.meta.env.VITE_TOSS_IAP_SKU} processProductGrant onPurchased/> (이용 중이면 disabled '이용 중이에요'). 설정 섹션: benchmarkAgeBand/incomeBand Chip 선택, 프로모션 코드 TextField+Button. States: 결제 성공 Toast '프리미엄이 시작됐어요', 취소 Toast '결제를 닫았어요'. Interactions: Chip 선택 tickWeak+저장 Toast, 주요 CTA success 햅틱."
+  },
+  {
+    "id": "0017",
+    "title": "월간 AI 진단 (`/monthly`)",
+    "epic": "Epic 3. Pages",
+    "task": {
+      "description": "프리미엄 사용자는 getMonthlyAggregate로 월 집계를 만들어 postWeeklyReport 요청→monthly-report-card로 표시하고, 결과는 캐시(getCachedReport)를 우선 사용하며 '다시 분석' 시에만 재호출한다. 비프리미엄은 잠금 API 미호출. shareMonthlyReport로 공유 시 window.open/location.href 미발생. RouteState 없이 진입해도 이번 달 기본. AI 배지 노출.",
+      "acceptance_criteria": [
+        "프리미엄 200→monthly-report-card, 비프리미엄 잠금 API 미호출",
+        "재탭 시 캐시 사용, '다시 분석' 시 재호출",
+        "공유 시 window.open/location.href 미발생, state 없이 진입해도 크래시 없이 이번 달 기본"
+      ]
+    },
+    "covers": [
+      "F8-AC1",
+      "F8-AC2",
+      "F8-AC3",
+      "F8-AC4",
+      "F8-AC5"
+    ],
+    "files": [
+      "src/pages/Monthly.tsx"
+    ],
+    "definition_of_done": [
+      "캐시 우선+명시적 재분석",
+      "공유 시트만 사용"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "POST /api/v1/weekly-report (월 범위)",
+    "dependencies": [],
+    "ui_requirements": "Pattern: StatusPanel + PremiumGate + Share. TDS: Top, SummaryHero, Amount, ListRow, Paragraph, Button, Skeleton, Toast, Border. Layout: <Top title='월간 AI 진단'/>. 비프리미엄: 잠금 카드+Button '프리미엄 보기'(API 미호출). 프리미엄: 총지출 SummaryHero, 전월 대비 증감, insights ListRow, savingSuggestion, 'AI가 생성한 결과입니다' 배지 상시. 하단 Button '공유하기'→shareMonthlyReport(앱 내 공유 시트, 외부 이동 없음), Button '다시 분석'. States: Loading Skeleton, 503 Toast."
+  },
+  {
+    "id": "0018",
+    "title": "구독 관리 (`/subscriptions`)",
+    "epic": "Epic 3. Pages",
+    "task": {
+      "description": "detectSubscriptions 결과를 매달 나가는 구독 합계 SummaryHero와 ListRow 목록으로 표시하고, isDuplicateSuspect 항목에 dup-badge를 노출한다. 빈 상태에서는 총액을 숨기고 빈 상태를 렌더하며, 손상 데이터에서도 크래시 없이 빈 상태를 표시한다.",
+      "acceptance_criteria": [
+        "3건→ListRow 3개+subs-total 39,300원",
+        "중복 의심→dup-badge 노출",
+        "빈→총액 미표시 빈 상태, 손상 데이터→크래시 없이 빈 상태"
+      ]
+    },
+    "covers": [
+      "F9-AC2",
+      "F9-AC3",
+      "F9-AC4"
+    ],
+    "files": [
+      "src/pages/Subscriptions.tsx"
+    ],
+    "definition_of_done": [
+      "합계 Hero + 감지 리스트",
+      "손상 데이터 방어"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: StatusPanel. TDS: Top, SummaryHero, Amount, Badge, ListRow, Chip, Paragraph, Spacing, Border. Layout: <Top title='구독 관리'/> <SummaryHero label='매달 나가는 구독' value={<Amount value={38400} unit='원' typography='t1'/>}/> + 구독 ListRow(2RowTypeA top=name, bottom=lastChargedAt, right=Amount) 반복, isDuplicateSuspect 항목에 Badge '중복 의심'(dup-badge). States: Empty=EmptyState '감지된 구독이 없어요'(총액 미표시), 손상→빈 상태 크래시 없음. Interactions: 탭 전환 tickWeak."
+  },
+  {
+    "id": "0019",
+    "title": "라우터 + FloatingTabBar + 전역 Provider 배선 + state 가드",
+    "epic": "4",
+    "task": {
+      "description": "src/App.tsx에서 react-router-dom Routes(/, /add, /tx/:id, /report, /benchmark, /challenge, /challenge/:id, /premium, /monthly, /subscriptions)를 연결하고, 템플릿 FloatingTabBar(홈·내역·리포트·설정 4탭)와 광고/결제 SDK 전역 Provider를 함께 배선한다. 각 RouteState 수신 화면을 URL 직접 입력/새로고침해도 크래시 없이 홈 이동 또는 빈 상태로 방어한다. main.tsx는 수정 금지.",
+      "acceptance_criteria": [
+        "모든 경로 이동 동작, FloatingTabBar 탭 전환 동작",
+        "state 수신 화면을 URL 직접 입력/새로고침해도 크래시 없이 홈 이동 또는 빈 상태",
+        "main.tsx 미수정, 전역 Provider 1회 배선"
+      ]
+    },
+    "covers": [
+      "AC-G1",
+      "AC-G2"
+    ],
+    "files": [
+      "src/App.tsx",
+      "src/lib/routeGuard.ts"
+    ],
+    "definition_of_done": [
+      "App.tsx 단일 소유(라우팅+Provider)",
+      "모든 라우트 연결 확인"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "react-router-dom"
+    ],
+    "ui_requirements": "react-router-dom BrowserRouter+Routes. 템플릿 FloatingTabBar(2~5탭, 활성탭 컬러 틴트, 홈/내역/리포트/설정). 전역 SDK Provider(광고/결제) 1회 배선. RouteState는 src/lib/types.ts 타입 사용, useLocation().state ?? null + <Navigate to='/'/>로 가드. TDS 테마 토큰만."
+  },
+  {
+    "id": "0020",
+    "title": "AI 고지 다이얼로그 + AI 라벨 + 보상 게이트 + 검수 스윕",
+    "epic": "Epic 4. Integration",
+    "task": {
+      "description": "AI 첫 사용 시 1회 표시되는 고지 AlertDialog(aiNoticeAcknowledged 플래그)와 주간/월간/벤치마크 결과 및 공유 이미지에 일관 노출되는 AiBadge 컴포넌트를 만들고, TossRewardAd 게이트 사용을 확인한다. 최종 검수 스윕: build 성공·console.error 0, grep으로 HEX/window.open/외부 SDK 0건, 다크모드 렌더 정상. App.tsx/main.tsx는 수정하지 않는다.",
+      "acceptance_criteria": [
+        "첫 AI 사용 시 다이얼로그 1회, 재사용 시 미표시",
+        "주간/월간/벤치마크 결과 및 공유 이미지 모두 AI 배지 노출",
+        "npm run build 성공·console.error 0, grep HEX/window.open/외부 SDK 0건"
+      ]
+    },
+    "covers": [
+      "AC-G4",
+      "AC-G5",
+      "AC-G6",
+      "AC-G12"
+    ],
+    "files": [
+      "src/components/AiNoticeDialog.tsx",
+      "src/components/AiBadge.tsx"
+    ],
+    "definition_of_done": [
+      "AI 고지 1회 표시 로직",
+      "다크모드/가드레일 최종 확인"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "TDS: AlertDialog(왼쪽 '닫기'), Paragraph, Badge. AiNoticeDialog: 첫 진입 시 '이 서비스는 생성형 AI를 활용합니다' AlertDialog 1회(aiNoticeAcknowledged=true 저장). AiBadge: TDS Badge/Chip로 'AI가 생성한 결과입니다' 라벨, 색상은 var(--tds-color-*)만. HEX/window.open/외부 SDK 미사용."
+  }
+]
