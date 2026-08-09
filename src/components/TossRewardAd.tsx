@@ -3,6 +3,7 @@ import {
   loadFullScreenAd,
   showFullScreenAd,
 } from "@apps-in-toss/web-framework";
+import { Button, Paragraph } from "@toss/tds-mobile";
 import "@/styles/reward-ad.css";
 
 interface TossRewardAdProps {
@@ -119,15 +120,16 @@ export function TossRewardAd({
 
   return (
     <div className="reward-ad-gate">
-      <p className="reward-ad-description">{description}</p>
-      <button
-        className={`reward-ad-button${isShowing ? " reward-ad-button--loading" : ""}`}
+      <Paragraph.Text typography="st10">{description}</Paragraph.Text>
+      <Button
+        variant="fill"
+        display="block"
         onClick={handleWatch}
         disabled={isShowing || !adLoaded}
         aria-label={buttonText}
       >
         {isShowing ? "광고 재생 중..." : !adLoaded ? "광고 준비 중..." : buttonText}
-      </button>
+      </Button>
     </div>
   );
 }

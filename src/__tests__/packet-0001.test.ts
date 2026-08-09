@@ -103,8 +103,8 @@ describe("Packet 0001: Domain Types + Shared Band Alias + RouteState + API Types
     };
 
     expect(result.ageBand).toBe("25-30");
-    // @ts-expect-error — string widening should error
     const invalid: BenchmarkResult = {
+      // @ts-expect-error — string widening should error
       ageBand: "invalid",
       incomeBand: "250-350",
       categories: [],
@@ -140,9 +140,9 @@ describe("Packet 0001: Domain Types + Shared Band Alias + RouteState + API Types
     expect(req.profile.ageBand).toBe("25-30");
     expect(req.profile.incomeBand).toBe("250-350");
 
-    // @ts-expect-error — wider string type should error
     const invalid: AnalyzeWeekRequest = {
       expenses: [],
+      // @ts-expect-error — wider string type should error
       profile: { ageBand: "invalid", incomeBand: "invalid" },
     };
     expect(invalid).toBeDefined();
@@ -158,9 +158,10 @@ describe("Packet 0001: Domain Types + Shared Band Alias + RouteState + API Types
     expect(req.ageBand).toBe("31-34");
     expect(req.incomeBand).toBe("350-450");
 
-    // @ts-expect-error
     const invalid: BenchmarkRequest = {
+      // @ts-expect-error
       ageBand: "invalid",
+      // @ts-expect-error
       incomeBand: "invalid",
       categories: [],
     };
@@ -350,8 +351,8 @@ describe("Packet 0001: Domain Types + Shared Band Alias + RouteState + API Types
     expect(ageBand).toBe("25-30");
 
     // But direct string assignment to AgeBand field should error at compile-time
-    // @ts-expect-error
     const profile: UserProfile = {
+      // @ts-expect-error
       ageBand: Math.random().toString(), // Wider type — error
       incomeBand: "250-350",
       isPremium: false,
