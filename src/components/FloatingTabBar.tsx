@@ -49,6 +49,7 @@ export function FloatingTabBar({ items }: { items: TabItem[] }) {
             aria-selected={active}
             aria-label={item.label}
             onClick={() => {
+              console.log("[TAB] click", item.path, "active=", active, "navType=", typeof navigate);
               if (active) return;
               try {
                 Promise.resolve(generateHapticFeedback({ type: "tickWeak" })).catch(() => {});

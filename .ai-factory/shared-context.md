@@ -201,6 +201,7 @@ export interface RouteState {
     FloatingTabBar.tsx
     MiniBar.tsx
     PageShell.tsx
+    RouteGuard.tsx
     ScreenScaffold.tsx
     Sparkline.tsx
     StateView.tsx
@@ -209,21 +210,32 @@ export interface RouteState {
     TossRewardAd.tsx
   hooks/
   lib/
+    __rrid.ts
     contract.ts
     storage.ts
     types.ts
     utils.ts
   main.tsx
   pages/
+    Add.tsx
+    Benchmark.tsx
+    Challenge.tsx
+    Expenses.tsx
     Home.tsx
+    Onboarding.tsx
+    Premium.tsx
+    Report.tsx
+    Settings.tsx
     __TdsGallery.tsx
   styles/
     globals.css
     reward-ad.css
   types/
+    jest-dom.d.ts
   vite-env.d.ts
 
 ### Exports (src/lib/)
+- __rrid.ts: export const rrMarker = RR
 - contract.ts: export type Profile =; export type Expense =; export type Report =; export type Benchmark =; export type Challenge =; export type RouteState =; export type loadProfileFn = () => Promise<Profile | null>; export type saveProfileFn = (profile: Profile) => Promise<void>
 - storage.ts: export function getItem<T>(key: string): T | null; export function setItem<T>(key: string, value: T): void; export function removeItem(key: string): void
 - types.ts: export type AgeBand = "25-30" | "31-34" | "35-38"; export type IncomeBand = "250-350" | "350-450"; export type Category = | "식비" | "카페/간식" | "배달" | "교통" | "쇼핑" | "구독" | "문화/여가" | "기타"; export interface UserProfile; export interface Expense; export interface WasteInsight; export interface WeeklyReport; export interface BenchmarkResult
@@ -238,6 +250,7 @@ export interface RouteState {
 - FloatingTabBar.tsx: FloatingTabBar
 - MiniBar.tsx: MiniBar
 - PageShell.tsx: PageShell
+- RouteGuard.tsx: RouteGuard
 - ScreenScaffold.tsx: ScreenScaffold
 - Sparkline.tsx: Sparkline
 - StateView.tsx: EmptyState, LoadingState
