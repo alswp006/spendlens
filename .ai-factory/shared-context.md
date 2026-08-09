@@ -262,3 +262,4 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 ## Already Implemented (do NOT duplicate or overwrite)
 - 0001: 도메인 타입 + 공유 밴드 alias + RouteState + API 타입 (files: src/lib/types.ts)
 - 0002: Base storage 유틸 + Profile/Expense storage + 집계 (files: src/lib/storage/base.ts, src/lib/storage/profile.ts, src/lib/storage/expenses.ts, src/lib/domain/aggregate.ts)
+- 0003: Reports/Benchmark/Challenges storage + Challenge 도메인 (files: src/lib/storage/reports.ts, src/lib/storage/benchmark.ts, src/lib/storage/challenges.ts, src/lib/domain/challenge.ts)
