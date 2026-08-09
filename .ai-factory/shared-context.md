@@ -304,3 +304,4 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0012: Premium 페이지 — /premium (files: src/pages/Premium.tsx)
 - 0013: Settings 페이지 — /settings (files: src/pages/Settings.tsx)
 - 0015: AI 최초 이용 고지 게이트 + 전역 검수 스윕 (files: src/components/AINoticeGate.tsx, src/hooks/useAiNotice.ts)
+- heal-1-01: 라우터 배선 + 온보딩 가드 무한 루프 차단 + 전역 Provider 완성 (files: src/App.tsx, src/components/RouteGuard.tsx)

@@ -1,26 +1,27 @@
-# Sprint Contract — AI Notice Gate + Global Compliance Sweep
+# Sprint Contract: 전역 FloatingTabBar 배치 + 활성 탭 틴트
 
 ## Deliverables
 | File | Change |
 |------|--------|
-| `src/components/AINoticeGate.tsx` | AlertDialog wrapper: accept → patchProfile(aiNoticeAcknowledged:true), dismiss/back → no-op |
-| `src/hooks/useAiNotice.ts` | `useAiNotice()` hook: returns `{ show: boolean, acknowledge: () => Promise<void> }` |
-| `src/pages/report.tsx`, `src/pages/benchmark.tsx` | Wrap AI result render with `<AINoticeGate onAcknowledge={...}>` |
-| Codebase audit | Remove all `#[0-9a-fA-F]{6}` HEX literals, external URLs, "설치" prompts, external logging (GA/Amplitude) |
-| Verify build | `vite build` → zero `console.error`, zero CORS errors in dist/ |
+| `src/App.tsx` | Import FloatingTabBar, useLocation; wrap pages with top-level layout; show/hide based on pathname; pass activeTab prop |
+| Layout | FloatingTabBar 배치: App.tsx 레이아웃 최상단 페이지 래퍼 → [홈, 내역, 리포트, 설정] 탭 |
+| Active tab logic | useLocation().pathname로 활성 탭 계산: "/" → home, "/history" → history, "/report" → report, "/settings" → settings |
+| Onboarding gate | `/onboarding` 경로에서만 탭바 숨김 (display:none or conditional render) |
 
 ## Types to Import
 ```typescript
-import type { UserProfile } from "@/lib/types"; // aiNoticeAcknowledged: boolean
+// No shared types needed — FloatingTabBar는 UI 컴포넌트, activeTab prop만 전달
 ```
 
 ## Validation
-1. `pnpm typecheck` — zero errors
-2. `pnpm test` — tests pass
-3. `vite build` && `npm run preview` — NO console.error, NO external domains
-4. `rg "#[0-9a-f]{6}|http:|https:|GA_ID|amplitude|설치" src/` — 0 results
+1. `pnpm dev` → 홈/내역/리포트/설정 방문 시 해당 탭만 틴트(컬러 강조)
+2. `/onboarding` 방문 → 탭바 없음
+3. 탭 클릭 → pathname 변경 및 네비게이션 정상
+4. `pnpm typecheck` — zero errors
+5. `pnpm test` — 관련 tests pass (있으면)
 
 ## Forbidden
-- NO modifications to `main.tsx` or `App.tsx`
-- NO custom CSS margins/padding on TDS components
-- NO mock UI when SDK unavailable (guard + graceful degrade only)
+- NO modifications to `src/main.tsx`
+- NO modifications to pages/ or other components
+- NO TDS Tab 컴포넌트로 전역 네비 구현 (FloatingTabBar만 사용)
+- NO Tailwind/CSS로 커스텀 탭바 구현
