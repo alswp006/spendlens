@@ -1,9 +1,7 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { RouteGuard } from './components/RouteGuard';
 import { FloatingTabBar } from './components/FloatingTabBar';
-import { getItem } from './lib/storage';
-import { AppStoreProvider } from './lib/store';
-import type { UserProfile } from './lib/types';
+import { AppStoreProvider, useAppStore } from './lib/store';
 import Home from './pages/Home';
 import Onboarding from './pages/Onboarding';
 import Add from './pages/Add';
@@ -14,19 +12,25 @@ import Challenge from './pages/Challenge';
 import Premium from './pages/Premium';
 import Settings from './pages/Settings';
 
-function useOnboarded() {
-  const profile = getItem<UserProfile>('spendlens.profile.v1');
-  return profile?.onboarded ?? false;
-}
-
 export default function App() {
-  const onboarded = useOnboarded();
-  const location = useLocation();
-  const showTabBar = onboarded && location.pathname !== '/onboarding';
   return (
     <AppStoreProvider>
+      <AppRoutes />
+    </AppStoreProvider>
+  );
+}
+
+function AppRoutes() {
+  const { profile, isLoading } = useAppStore();
+  // store 로드 전에는 onboarded 미확정(undefined) — 가드가 리다이렉트를 보류한다.
+  const onboarded = isLoading ? undefined : profile.onboarded;
+  const location = useLocation();
+  const showTabBar = onboarded === true && location.pathname !== '/onboarding';
+
+  return (
+    <>
       <Routes>
-        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/onboarding" element={<RouteGuard onboarded={onboarded}><Onboarding /></RouteGuard>} />
         <Route path="/" element={<RouteGuard onboarded={onboarded}><Home /></RouteGuard>} />
         <Route path="/add" element={<RouteGuard onboarded={onboarded}><Add /></RouteGuard>} />
         <Route path="/expenses" element={<RouteGuard onboarded={onboarded}><Expenses /></RouteGuard>} />
@@ -35,7 +39,7 @@ export default function App() {
         <Route path="/challenge" element={<RouteGuard onboarded={onboarded}><Challenge /></RouteGuard>} />
         <Route path="/premium" element={<RouteGuard onboarded={onboarded}><Premium /></RouteGuard>} />
         <Route path="/settings" element={<RouteGuard onboarded={onboarded}><Settings /></RouteGuard>} />
-        <Route path="*" element={<RouteGuard onboarded={onboarded}><Home /></RouteGuard>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {showTabBar && (
         <FloatingTabBar
@@ -47,6 +51,6 @@ export default function App() {
           ]}
         />
       )}
-    </AppStoreProvider>
+    </>
   );
 }
