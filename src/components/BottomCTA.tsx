@@ -27,10 +27,13 @@ export function SubmitFooter({
   label,
   onClick,
   disabled,
+  testId,
 }: {
   label: ReactNode;
   onClick: () => void;
   disabled?: boolean;
+  /** 레이아웃 테스트용 data-testid */
+  testId?: string;
 }) {
   return (
     <FixedBottomCTA
@@ -39,6 +42,7 @@ export function SubmitFooter({
         onClick();
       }}
       disabled={disabled}
+      data-testid={testId}
     >
       {label}
     </FixedBottomCTA>

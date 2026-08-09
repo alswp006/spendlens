@@ -140,16 +140,30 @@ export function mockTds() {
     BottomCTA: ({ children }: any) =>
       React.createElement("div", { "data-slot": "bottom-cta" }, children),
 
+    FixedBottomCTA: Object.assign(
+      ({ children, onClick, disabled, ...props }: any) =>
+        React.createElement("button", { onClick, disabled, ...props }, children),
+      {
+        Double: ({ children }: any) =>
+          React.createElement("div", { "data-slot": "fixed-bottom-cta-double" }, children),
+      },
+    ),
+
     BottomSheet: Object.assign(
       ({ children, open }: any) =>
         open ? React.createElement("div", { role: "dialog" }, children) : null,
       { Header: ({ children }: any) => React.createElement("div", null, children) },
     ),
 
-    Chip: ({ children, selected, onClick }: any) =>
+    Chip: Object.assign(
+      ({ children, ...props }: any) => React.createElement("div", { role: "group", ...props }, children),
+      {},
+    ),
+
+    ChipItem: ({ children, selected, onClick, ...props }: any) =>
       React.createElement(
         "button",
-        { role: "button", "aria-pressed": selected, onClick },
+        { type: "button", role: "button", "aria-pressed": selected, onClick, ...props },
         children,
       ),
 
