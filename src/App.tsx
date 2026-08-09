@@ -24,7 +24,7 @@ export default function App() {
   const location = useLocation();
   const showTabBar = onboarded && location.pathname !== '/onboarding';
   return (
-    <>
+    <AppStoreProvider>
       <Routes>
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/" element={<RouteGuard onboarded={onboarded}><Home /></RouteGuard>} />
@@ -47,6 +47,6 @@ export default function App() {
           ]}
         />
       )}
-    </>
+    </AppStoreProvider>
   );
 }

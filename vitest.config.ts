@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
+  optimizeDeps: { force: true },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -14,7 +15,15 @@ export default defineConfig({
       // 반드시 `react-router`보다 먼저 두어야 한다(더 구체적인 패턴 우선 매칭) — 아니면
       // `react-router` 별칭이 subpath를 삼켜 깨진 경로가 되고, node 폴백으로 CJS
       // dom-export.js(→ CJS 컨텍스트 청크)가 로드되어 두 번째 인스턴스가 생긴다.
-      'react-router-dom': path.resolve(__dirname, 'node_modules/react-router-dom/dist/index.mjs'),
+      // react-router v7: react-router-dom index.mjs는 `export * from "react-router"` +
+      // 별도 `react-router/dom` import 구조다. vitest에서 테스트 파일(ESM 변환)과
+      // 동적 import된 App.tsx가 react-router-dom을 서로 다른 조건(import=ESM / node=CJS)으로
+      // 해석하면 두 인스턴스가 로드되고, MemoryRouter가 심는 NavigationContext와
+      // useNavigate가 읽는 컨텍스트가 갈라져 navigate가 조용히 no-op이 된다(탭 전환 실패).
+      // 세 진입점을 모두 react-router 본체(.mjs) 단일 파일로 못박아 한 인스턴스만 로드되게 한다.
+      // 앱은 HydratedRouter/RSC를 안 쓰므로 react-router 본체가 export하는 것으로 충분하다.
+      // `react-router/dom`을 반드시 `react-router`보다 먼저 둘 것(더 구체적 패턴 우선 매칭).
+      'react-router-dom': path.resolve(__dirname, 'node_modules/react-router/dist/development/index.mjs'),
       'react-router/dom': path.resolve(__dirname, 'node_modules/react-router/dist/development/dom-export.mjs'),
       'react-router': path.resolve(__dirname, 'node_modules/react-router/dist/development/index.mjs'),
     },

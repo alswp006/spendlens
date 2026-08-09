@@ -193,6 +193,7 @@ export interface RouteState {
 ### File Tree (src/)
   App.tsx
   components/
+    AINoticeGate.tsx
     AdSlot.tsx
     Amount.tsx
     BottomCTA.tsx
@@ -208,11 +209,24 @@ export interface RouteState {
     SummaryHero.tsx
     TossPurchase.tsx
     TossRewardAd.tsx
+    __navtest.tsx
+    __tabprobe.tsx
+    __whichctx.tsx
+    __whichreact.tsx
+    __whichrr.ts
+    __whichrr2.tsx
+    __zprobe.tsx
   hooks/
+    useAiNotice.ts
   lib/
     __rrid.ts
+    api/
     contract.ts
+    domain/
+    format.ts
+    storage/
     storage.ts
+    store.tsx
     types.ts
     utils.ts
   main.tsx
@@ -236,12 +250,24 @@ export interface RouteState {
 
 ### Exports (src/lib/)
 - __rrid.ts: export const rrMarker = RR
+- api/client.ts: export async function analyzeWeek( req: AnalyzeWeekRequest, ): Promise<AnalyzeWeekResponse>; export async function fetchBenchmark( req: BenchmarkRequest, ): Promise<BenchmarkResponse>
 - contract.ts: export type Profile =; export type Expense =; export type Report =; export type Benchmark =; export type Challenge =; export type RouteState =; export type loadProfileFn = () => Promise<Profile | null>; export type saveProfileFn = (profile: Profile) => Promise<void>
+- domain/aggregate.ts: export interface CategoryAggregate; export function aggregateByCategory(expenses: Expense[]): CategoryAggregate[]; export interface Period; export function getThisWeek(): Period; export function getLastWeek(): Period; export function getThisMonth(): Period; export function getLast30Days(): Period
+- domain/challenge.ts: export interface ChallengeProgress; export function computeProgress(challenge: SavingChallenge): ChallengeProgress; export function recomputeChallenge( challenge: SavingChallenge, expenses: Expense[] ): SavingChallenge; export function baselineAmount( expenses: Expense[], category: Category, now: number = Date.now() ): number
+- domain/smsParser.ts: export function parseSmsText(text: string): Partial<Expense> | null
+- format.ts: export function formatKRW(n: number): string
+- storage/base.ts: export const STORAGE_KEYS =; export function safeGetJSON<T>(key: string, fallback: T): T; export function safeSetJSON(key: string, value: unknown): boolean
+- storage/benchmark.ts: export function getBenchmark(): BenchmarkResult | null; export function saveBenchmark(benchmark: BenchmarkResult): void; export function clearBenchmark(): void; export function hasBenchmark(): boolean; export function isBenchmarkStale( benchmark: BenchmarkResult | null, profile:
+- storage/challenges.ts: export function getChallenges(): SavingChallenge[]; export function saveChallenge(challenge: SavingChallenge): SavingChallenge[]; export function updateChallenge( id: string, patch: Partial<SavingChallenge> ): SavingChallenge[]
+- storage/expenses.ts: export function getExpenses(): Expense[]; export type AddExpenseInput =; export function addExpense(input: AddExpenseInput): Expense; export function deleteExpense(id: string): void
+- storage/profile.ts: export function getProfile(): UserProfile; export function saveProfile(profile: UserProfile): boolean; export function patchProfile(patch: Partial<UserProfile>): UserProfile
+- storage/reports.ts: export function getReports(): WeeklyReport[]; export function saveReport(report: WeeklyReport): WeeklyReport[]
 - storage.ts: export function getItem<T>(key: string): T | null; export function setItem<T>(key: string, value: T): void; export function removeItem(key: string): void
 - types.ts: export type AgeBand = "25-30" | "31-34" | "35-38"; export type IncomeBand = "250-350" | "350-450"; export type Category = | "식비" | "카페/간식" | "배달" | "교통" | "쇼핑" | "구독" | "문화/여가" | "기타"; export interface UserProfile; export interface Expense; export interface WasteInsight; export interface WeeklyReport; export interface BenchmarkResult
 - utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string
 
 ### Components (src/components/)
+- AINoticeGate.tsx: AINoticeGate
 - AdSlot.tsx: AdSlot
 - Amount.tsx: Amount
 - BottomCTA.tsx: SubmitFooter, ButtonStack
@@ -257,6 +283,10 @@ export interface RouteState {
 - SummaryHero.tsx: SummaryHero
 - TossPurchase.tsx: TossPurchase
 - TossRewardAd.tsx: TossRewardAd
+- __zprobe.tsx: ZProbe
+
+### Module Dependencies (import graph)
+  pages/Add.tsx → imports: components/ScreenScaffold, components/BottomCTA, lib/domain/sms...
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
 ## Already Implemented (do NOT duplicate or overwrite)
@@ -273,3 +303,4 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0011: Challenge 페이지 — /challenge (files: src/pages/Challenge.tsx)
 - 0012: Premium 페이지 — /premium (files: src/pages/Premium.tsx)
 - 0013: Settings 페이지 — /settings (files: src/pages/Settings.tsx)
+- 0015: AI 최초 이용 고지 게이트 + 전역 검수 스윕 (files: src/components/AINoticeGate.tsx, src/hooks/useAiNotice.ts)

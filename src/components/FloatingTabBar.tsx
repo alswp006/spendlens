@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, UNSAFE_NavigationContext } from "react-router-dom";
 import { generateHapticFeedback } from "@apps-in-toss/web-framework";
+(globalThis as any).__ftbNavCtx = UNSAFE_NavigationContext;
+(globalThis as any).__ftbUseNavigate = useNavigate;
 
 export type TabItem = {
   label: string;
@@ -26,6 +28,8 @@ export function FloatingTabBar({ items }: { items: TabItem[] }) {
     <nav
       role="tablist"
       aria-label="메인 네비게이션"
+      data-testid="ftb-self-loc"
+      data-loc={location.pathname}
       style={{
         position: "fixed",
         left: 0,
@@ -49,13 +53,16 @@ export function FloatingTabBar({ items }: { items: TabItem[] }) {
             aria-selected={active}
             aria-label={item.label}
             onClick={() => {
+              console.log("DIAG ftb onClick fired, active=", active, "item.path=", item.path);
               if (active) return;
               try {
                 Promise.resolve(generateHapticFeedback({ type: "tickWeak" })).catch(() => {});
               } catch {
                 /* WebView 밖에서는 throw — 무시 */
               }
+              console.log("DIAG ftb calling navigate");
               navigate(item.path);
+              console.log("DIAG ftb navigate called");
             }}
             style={{
               flex: 1,
