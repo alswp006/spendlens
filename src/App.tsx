@@ -2,6 +2,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { RouteGuard } from './components/RouteGuard';
 import { FloatingTabBar } from './components/FloatingTabBar';
 import { getItem } from './lib/storage';
+import { AppStoreProvider } from './lib/store';
 import type { UserProfile } from './lib/types';
 import Home from './pages/Home';
 import Onboarding from './pages/Onboarding';
