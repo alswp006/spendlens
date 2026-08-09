@@ -2,6 +2,7 @@ export const STORAGE_KEYS = {
   PROFILE: "spendlens.profile.v1",
   EXPENSES: "spendlens.expenses.v1",
   REPORTS: "spendlens.reports.v1",
+  BENCHMARK: "spendlens.benchmark.v1",
   CHALLENGES: "spendlens.challenges.v1",
 } as const;
 
