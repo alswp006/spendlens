@@ -128,6 +128,17 @@ export function mockTds() {
         ),
     ),
 
+    TextArea: React.forwardRef(
+      ({ label, help, hasError, variant, ...props }: any, ref: any) =>
+        React.createElement(
+          "div",
+          null,
+          React.createElement("label", null, label),
+          React.createElement("textarea", { ref, "data-variant": variant, ...props }),
+          hasError && help && React.createElement("span", { role: "alert" }, help),
+        ),
+    ),
+
     Top: Object.assign(
       ({ children, title }: any) =>
         React.createElement(
