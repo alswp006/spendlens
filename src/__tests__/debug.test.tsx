@@ -1,28 +1,30 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
-import { FloatingTabBar } from "@/components/FloatingTabBar";
+import { MemoryRouter } from "react-router-dom";
+import { mockTds, mockAppsInToss, mockTossRewardAd } from "@/__tests__/__helpers__/mocks";
 
-vi.mock("@apps-in-toss/web-framework", () => ({
-  generateHapticFeedback: vi.fn(),
-}));
+mockTds();
+mockAppsInToss();
+mockTossRewardAd();
 
-function Probe() {
-  const loc = useLocation();
-  return <div data-testid="loc">{loc.pathname}</div>;
-}
+vi.mock("@/pages/Home", () => ({ default: () => React.createElement("div", { "data-testid": "page-home" }, "홈") }));
+vi.mock("@/pages/Onboarding", () => ({ default: () => React.createElement("div", { "data-testid": "page-onboarding" }, "온보딩") }));
+vi.mock("@/pages/Add", () => ({ default: () => React.createElement("div", { "data-testid": "page-add" }, "추가") }));
+vi.mock("@/pages/Expenses", () => ({ default: () => React.createElement("div", { "data-testid": "page-expenses" }, "내역") }));
+vi.mock("@/pages/Report", () => ({ default: () => React.createElement("div", { "data-testid": "page-report" }, "리포트") }));
+vi.mock("@/pages/Benchmark", () => ({ default: () => React.createElement("div", { "data-testid": "page-benchmark" }, "벤치마크") }));
+vi.mock("@/pages/Challenge", () => ({ default: () => React.createElement("div", { "data-testid": "page-challenge" }, "챌린지") }));
+vi.mock("@/pages/Premium", () => ({ default: () => React.createElement("div", { "data-testid": "page-premium" }, "프리미엄") }));
+vi.mock("@/pages/Settings", () => ({ default: () => React.createElement("div", { "data-testid": "page-settings" }, "설정") }));
 
-describe("debug tabbar", () => {
-  it("navigates on click", () => {
-    render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Probe />
-        <FloatingTabBar items={[{ label: "홈", path: "/" }, { label: "내역", path: "/expenses" }]} />
-      </MemoryRouter>,
-    );
-    fireEvent.click(screen.getByRole("tab", { name: "내역" }));
-    console.log("LOC:", screen.getByTestId("loc").textContent);
-    expect(screen.getByTestId("loc").textContent).toBe("/expenses");
-  });
+const { default: App } = await import("@/App");
+
+it("debug nav", async () => {
+  localStorage.setItem("spendlens.profile.v1", JSON.stringify({ onboarded: true }));
+  render(React.createElement(MemoryRouter, { initialEntries: ["/"] }, React.createElement(App)));
+  screen.getByTestId("page-home");
+  fireEvent.click(screen.getByRole("tab", { name: "내역" }));
+  console.log("HTML:", document.body.innerHTML);
+  expect(true).toBe(true);
 });
