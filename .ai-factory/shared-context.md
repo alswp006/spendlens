@@ -270,3 +270,4 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0008: Expenses List 페이지 — /expenses (files: src/pages/Expenses.tsx)
 - 0009: Weekly Report 페이지 — /report (files: src/pages/Report.tsx)
 - 0010: Benchmark 페이지 — /benchmark (files: src/pages/Benchmark.tsx)
+- 0011: Challenge 페이지 — /challenge (files: src/pages/Challenge.tsx)
