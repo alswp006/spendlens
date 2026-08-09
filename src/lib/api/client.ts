@@ -3,17 +3,54 @@ import type {
   AnalyzeWeekResponse,
   BenchmarkRequest,
   BenchmarkResponse,
+  ErrorResponse,
 } from "@/lib/types";
 
-// TDD red phase stub — implemented by the Coder against src/__tests__/packet-0004.test.ts
+const TIMEOUT_MS = 10_000;
+
+function isErrorResponse(x: unknown): x is ErrorResponse {
+  return (
+    typeof x === "object" &&
+    x !== null &&
+    "error" in x &&
+    typeof (x as { error: unknown }).error === "string"
+  );
+}
+
+async function postJson<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const parsed: unknown = await res.json().catch(() => null);
+      throw isErrorResponse(parsed) ? parsed : { error: `요청이 실패했습니다 (${res.status})` };
+    }
+
+    return (await res.json()) as TRes;
+  } catch (err) {
+    if (isErrorResponse(err)) throw err;
+    throw { error: "네트워크 오류가 발생했습니다" } satisfies ErrorResponse;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function analyzeWeek(
-  _req: AnalyzeWeekRequest,
+  req: AnalyzeWeekRequest,
 ): Promise<AnalyzeWeekResponse> {
-  throw new Error("analyzeWeek: not implemented");
+  return postJson<AnalyzeWeekRequest, AnalyzeWeekResponse>("/api/analyze-week", req);
 }
 
 export async function fetchBenchmark(
-  _req: BenchmarkRequest,
+  req: BenchmarkRequest,
 ): Promise<BenchmarkResponse> {
-  throw new Error("fetchBenchmark: not implemented");
+  return postJson<BenchmarkRequest, BenchmarkResponse>("/api/benchmark", req);
 }
