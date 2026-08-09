@@ -267,3 +267,4 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0005: Onboarding 페이지 — /onboarding (files: src/pages/Onboarding.tsx)
 - 0006: Home Dashboard 페이지 — / (files: src/pages/Home.tsx)
 - 0007: Add Expense 페이지 — /add (files: src/pages/AddExpense.tsx)
+- 0008: Expenses List 페이지 — /expenses (files: src/pages/Expenses.tsx)
