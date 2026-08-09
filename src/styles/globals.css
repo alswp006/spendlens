@@ -16,3 +16,21 @@ body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
+
+.toss-purchase-button {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 12px;
+  background-color: var(--adaptiveBlue500);
+  color: var(--white);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toss-purchase-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

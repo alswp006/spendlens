@@ -336,7 +336,7 @@ export function mockRouter() {
     return {
       ...actual,
       useNavigate: () => mockNavigate,
-      useLocation: () => mockLocation,
+      useLocation: actual.useLocation,
     };
   });
 }
