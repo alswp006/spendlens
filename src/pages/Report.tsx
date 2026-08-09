@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Top, Paragraph, Spacing, ListRow, Button, Badge, Toast, Asset } from "@toss/tds-mobile";
 import { ScreenScaffold } from "@/components/ScreenScaffold";
+import { AINoticeGate } from "@/components/AINoticeGate";
 import { SummaryHero } from "@/components/SummaryHero";
 import { Card } from "@/components/Card";
 import { Amount } from "@/components/Amount";
@@ -170,7 +171,9 @@ export default function Report() {
         </>
       ) : (
         <TossRewardAd slotId={AD_SLOT_ID} description="광고를 보면 이번 주 리포트를 볼 수 있어요">
-          <ReportSummary expenses={thisWeekExpenses} profile={profile} weekStart={start} weekEnd={end} />
+          <AINoticeGate>
+            <ReportSummary expenses={thisWeekExpenses} profile={profile} weekStart={start} weekEnd={end} />
+          </AINoticeGate>
         </TossRewardAd>
       )}
     </ScreenScaffold>

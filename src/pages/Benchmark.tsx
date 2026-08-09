@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Top, Spacing, ListRow, Button, Badge, Toast, Asset } from "@toss/tds-mobile";
 import { ScreenScaffold } from "@/components/ScreenScaffold";
+import { AINoticeGate } from "@/components/AINoticeGate";
 import { Card } from "@/components/Card";
 import { Amount } from "@/components/Amount";
 import { MiniBar } from "@/components/MiniBar";
@@ -165,7 +166,9 @@ export default function Benchmark() {
           />
         </>
       ) : (
-        <BenchmarkSummary profile={profile} expenses={expenses} />
+        <AINoticeGate>
+          <BenchmarkSummary profile={profile} expenses={expenses} />
+        </AINoticeGate>
       )}
     </ScreenScaffold>
   );

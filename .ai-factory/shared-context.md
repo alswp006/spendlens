@@ -272,3 +272,4 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0010: Benchmark 페이지 — /benchmark (files: src/pages/Benchmark.tsx)
 - 0011: Challenge 페이지 — /challenge (files: src/pages/Challenge.tsx)
 - 0012: Premium 페이지 — /premium (files: src/pages/Premium.tsx)
+- 0013: Settings 페이지 — /settings (files: src/pages/Settings.tsx)
