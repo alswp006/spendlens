@@ -1,0 +1,595 @@
+[
+  {
+    "id": "0001",
+    "title": "도메인 타입 + 공유 밴드 alias + RouteState + API 타입",
+    "epic": "Epic 1: Data/Types",
+    "task": {
+      "description": "전 엔티티 타입/인터페이스를 순수 타입으로 정의(런타임 코드 0). 공유 `AgeBand`/`IncomeBand` alias를 단일 출처로 만들고 `UserProfile`·`BenchmarkResult`·API 요청 타입이 모두 이를 참조하도록 좁힌다. `Category` 유니온, `Expense`, `WasteInsight`, `WeeklyReport`, `SavingChallenge`, `AnalyzeWeekRequest/Response`, `BenchmarkRequest/Response`, 공통 `{error:string}`, `RouteState` 맵을 정의한다.",
+      "acceptance_criteria": [
+        "`BenchmarkResult.ageBand`/`incomeBand`가 `AgeBand`/`IncomeBand`로 선언되어 `string` 대입 시 컴파일 에러",
+        "API 요청 타입의 밴드 필드도 동일 alias 참조",
+        "`RouteState` export 존재(9개 경로 키)",
+        "`tsc --noEmit` 통과"
+      ]
+    },
+    "covers": [
+      "데이터 모델 타입 계약",
+      "밴드 타입 불일치 FIX",
+      "RouteState 계약"
+    ],
+    "files": [
+      "src/lib/types.ts"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과",
+      "BenchmarkResult 밴드 필드가 리터럴 유니온",
+      "RouteState export 존재"
+    ],
+    "depends_on": [],
+    "db_schema": "type AgeBand='25-30'|'31-34'|'35-38'; type IncomeBand='250-350'|'350-450'; interface Expense{id:string;amount:number;category:Category;merchant:string;memo:string;timestamp:number;source:'sms'|'manual';createdAt:number} → keys: spendlens.*.v1",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0002",
+    "title": "Base storage 유틸 + Profile/Expense storage + 집계",
+    "epic": "Epic 1: Data/Storage",
+    "task": {
+      "description": "`safeGetJSON<T>(key,fallback)`·`safeSetJSON(key,value):boolean`와 `STORAGE_KEYS`(spendlens.*.v1) 상수를 만든다. JSON.parse 실패 시 fallback 반환(예외/console.error 없음), QuotaExceededError 시 false 반환. profile CRUD(`getProfile/saveProfile/patchProfile`), expense CRUD(`addExpense`는 uuid·createdAt 부여+2,000건 초과 시 최소 createdAt 제거, `getExpenses/deleteExpense`), `aggregateByCategory`(내림차순,ratio 0–1)+기간 프리셋 헬퍼를 구현한다.",
+      "acceptance_criteria": [
+        "손상 JSON 상태에서 safeGetJSON이 []/기본값 반환·console.error 미호출",
+        "addExpense 후 getExpenses().length===1·id/createdAt 존재, 2,000건 상태 add 시 개수 ≤2,000",
+        "식비12,000/배달20,000 집계 시 [{식비,12000,0.375},{배달,20000,0.625}] 내림차순, total 0 안전",
+        "컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F1-AC1",
+      "F1-AC2",
+      "F1-AC3",
+      "F1-AC4",
+      "F1-AC5",
+      "F1-AC6",
+      "F3-AC3",
+      "GC-2"
+    ],
+    "files": [
+      "src/lib/storage/base.ts",
+      "src/lib/storage/profile.ts",
+      "src/lib/storage/expenses.ts",
+      "src/lib/domain/aggregate.ts"
+    ],
+    "definition_of_done": [
+      "손상/quota 방어 동작",
+      "addExpense 용량 가드 동작",
+      "aggregateByCategory 내림차순·ratio 정확",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0001"
+    ],
+    "db_schema": "keys: spendlens.profile.v1(UserProfile), spendlens.expenses.v1(Expense[] max2000)",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0003",
+    "title": "Reports/Benchmark/Challenges storage + Challenge 도메인",
+    "epic": "Epic 1: Data/Storage",
+    "task": {
+      "description": "`getReports/saveReport`(24개 초과 시 weekStart 최소 삭제), `getBenchmark/saveBenchmark`(단일 객체), `getChallenges/saveChallenge/updateChallenge`(최대 12)를 base 유틸 경유로 구현. Challenge 도메인 로직 `computeProgress(challenge)`(percent,remaining), `recomputeChallenge(challenge,expenses)`(카테고리 실지출로 currentSpent 재계산, 초과→failed, 월말까지 이하→completed), baselineAmount(최근 30일) 헬퍼 구현.",
+      "acceptance_criteria": [
+        "리포트 24개 상태 신규 저장 시 최종 24개 유지·weekStart 최소 삭제",
+        "target120,000/currentSpent90,000 → percent75·remaining30,000",
+        "배달 추가 후 recompute 시 currentSpent 증가·초과 시 failed",
+        "컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F1-AC7",
+      "F6-AC2",
+      "F6-AC3"
+    ],
+    "files": [
+      "src/lib/storage/reports.ts",
+      "src/lib/storage/benchmark.ts",
+      "src/lib/storage/challenges.ts",
+      "src/lib/domain/challenge.ts"
+    ],
+    "definition_of_done": [
+      "리포트 24개 상한 유지",
+      "challenge 진행률/상태 재계산 정확",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0001"
+    ],
+    "db_schema": "keys: spendlens.reports.v1(WeeklyReport[] max24), spendlens.benchmark.v1(BenchmarkResult), spendlens.challenges.v1(SavingChallenge[] max12)",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0004",
+    "title": "SMS 파서 + API client + State store + 통화 포맷",
+    "epic": "Epic 1: Data/Domain",
+    "task": {
+      "description": "`parseSmsText(text):Partial<Expense>|null`(정규식 금액/가맹점/시각+키워드 카테고리 추론, 금액 미검출 시 null). 외부 API `analyzeWeek/fetchBenchmark`(VITE_API_BASE, 10s AbortController timeout, try/catch, 실패 시 {error} throw, console.error 미호출, 원문 SMS 미전송). 경량 Context store `useAppStore`(부팅 시 프로필/지출 로드, premiumUntil<now면 isPremium:false patch), `formatKRW(n)`=Intl.NumberFormat('ko-KR').",
+      "acceptance_criteria": [
+        "신한카드 SMS 예시 → {amount:12000,merchant:'스타벅스',category:'카페/간식',timestamp}, 무의미 문자 → null",
+        "API 500/네트워크 오류 시 throw하되 console.error 미호출·timeout 동작",
+        "premiumUntil 과거 부팅 시 isPremium===false, formatKRW(12000)==='12,000원'",
+        "컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F2-AC1",
+      "F2-AC4",
+      "F4-AC2",
+      "F4-AC5",
+      "F5-AC2",
+      "F5-AC5",
+      "F7-AC3",
+      "GC-3",
+      "CP-13"
+    ],
+    "files": [
+      "src/lib/domain/smsParser.ts",
+      "src/lib/api/client.ts",
+      "src/lib/store.tsx",
+      "src/lib/format.ts"
+    ],
+    "definition_of_done": [
+      "smsParser 추출/null 동작",
+      "API timeout·에러 처리",
+      "store 만료 재잠금·formatKRW 동작",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0002"
+    ],
+    "db_schema": "",
+    "api_contract": "POST {VITE_API_BASE}/api/analyze-week {categories,totals}→AnalyzeWeekResponse | POST /api/benchmark {ageBand,incomeBand,categories}→BenchmarkResponse | errors {error:string}",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0005",
+    "title": "Onboarding 페이지 — /onboarding",
+    "epic": "Epic 2: Pages",
+    "task": {
+      "description": "연령대/소득대 Chip 그룹 2개+하단 SubmitFooter Button으로 온보딩 폼 구현. 두 밴드 모두 선택 전 '시작하기' 비활성화. 완료 시 saveProfile+onboarded:true 저장 후 navigate('/',{replace:true}). AI 활용 고지 AlertDialog는 aiNoticeAcknowledged=false일 때 1회 표시하고 확인 시 ack. Chip 선택에 tickWeak, CTA에 success 햅틱.",
+      "acceptance_criteria": [
+        "두 밴드 모두 선택 전 CTA disabled",
+        "선택 후 저장·홈 이동(replace)",
+        "data-testid='onboarding-cta' 존재·HEX 리터럴 0개",
+        "컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F8-AC1",
+      "CP-11"
+    ],
+    "files": [
+      "src/pages/Onboarding.tsx"
+    ],
+    "definition_of_done": [
+      "밴드 미선택 시 disabled",
+      "저장·리다이렉트 동작",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0002",
+      "0004"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "@toss/tds-mobile",
+      "@apps-in-toss/web-framework"
+    ],
+    "ui_requirements": "Pattern ButtonStack. ScreenScaffold>Top(SpendLens 시작하기)>Spacing16>Paragraph.Text t3 '연령대를 골라주세요'>Spacing12>flex(gap8,wrap) Chip '25-30'/'31-34'/'35-38' variant outlined(선택 시 filled)>Spacing24>Paragraph.Text t3 '월 소득 구간을 골라주세요'>Spacing12>flex(gap8) Chip '250-350만원'/'350-450만원'>SubmitFooter>Button variant fill size large '시작하기'(두 밴드 선택 전 disabled). AlertDialog open={!aiNoticeAcknowledged} title 'AI 활용 안내' description '이 서비스는 생성형 AI로 소비 진단 결과를 제공해요. 결과는 참고용이에요.' 확인 버튼→ack. States: Loading 없음, Error 밴드 미선택 시 CTA disabled. Chip 단일선택 토글 tickWeak, 시작하기 success 햅틱."
+  },
+  {
+    "id": "0006",
+    "title": "Home Dashboard 페이지 — /",
+    "epic": "Epic 2: Pages",
+    "task": {
+      "description": "이번 달 총지출 SummaryHero(CountUp)+카테고리 비중 MiniBar 리스트(내림차순 top3)+최근 지출 ListRow 구현. 요약과 최근 내역 사이에 AdSlot 배너 배치(겹침 없이). 로딩=Skeleton 3행, 빈=EmptyState+지출 추가 CTA. 카테고리/항목 탭→/expenses, 지출 추가→/add, 리포트 보기→/report. FloatingTabBar 탭 전환 tickWeak.",
+      "acceptance_criteria": [
+        "식비12,000+배달20,000 시 data-testid='month-total-hero'가 32,000원 표시",
+        "data-testid='category-breakdown' 내림차순 렌더",
+        "0건 시 EmptyState·터치타깃 ≥44px",
+        "컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F3-AC1",
+      "F3-AC2",
+      "F3-AC4",
+      "F3-AC5"
+    ],
+    "files": [
+      "src/pages/Home.tsx"
+    ],
+    "definition_of_done": [
+      "총지출 CountUp 표시",
+      "breakdown 내림차순",
+      "빈 상태·광고 배치",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0002",
+      "0004"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "@toss/tds-mobile",
+      "@apps-in-toss/web-framework"
+    ],
+    "ui_requirements": "Pattern StatusPanel. ScreenScaffold>Top(이번 달 소비)>SummaryHero data-testid='month-total-hero' label='이번 달 총지출' value=<Amount value={monthTotal} unit='원' typography='t1'/>(CountUp) caption='지난달보다 8% 적게 썼어요'>Spacing24>Paragraph.Text t4 '카테고리 비중'>Spacing12>div data-testid='category-breakdown' {top3.map ListRow contents=ListRow.Texts 2RowTypeA top=category bottom=<MiniBar ratio/> right=<Amount unit='원'/>}>Spacing16>AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID}>Spacing16>Paragraph.Text t4 '최근 지출'>{recent ListRow}. States: Loading SummaryHero Skeleton+리스트 Skeleton3행; Empty EmptyState title '아직 지출이 없어요' description '문자를 붙여넣어 시작하세요' action Button weak '지출 추가'→/add; Error Paragraph secondary '불러오지 못했어요'+재시도 Button. 색상 var(--tds-color-*)."
+  },
+  {
+    "id": "0007",
+    "title": "Add Expense 페이지 — /add",
+    "epic": "Epic 2: Pages",
+    "task": {
+      "description": "붙여넣기 TextField(textarea)+'분석' Button(parseSmsText로 폼 프리필, 실패 시 Toast+수동 모드 유지)+금액(inputMode numeric)/가맹점/메모 TextField+카테고리 Chip(수동 변경)+SubmitFooter '저장'. 저장 중 loading 비활성화(중복 방지). 금액 ≤0 시 TextField 에러 '금액을 1원 이상 입력해주세요'. 저장 성공 시 Toast '지출이 추가되었어요'+navigate('/expenses',{state:{added:true}}). location.state.prefillText는 ?? null 확인 후 사용.",
+      "acceptance_criteria": [
+        "예시 SMS 붙여넣기·분석 시 폼 프리필",
+        "금액0 저장 차단+에러 문구",
+        "저장 성공 토스트·이동, state 없이 직접 진입해도 크래시 없이 빈 폼",
+        "data-testid='save-expense-btn'·컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F2-AC1",
+      "F2-AC2",
+      "F2-AC3"
+    ],
+    "files": [
+      "src/pages/AddExpense.tsx"
+    ],
+    "definition_of_done": [
+      "SMS 프리필",
+      "금액 검증",
+      "저장·이동·loading",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0004"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "@toss/tds-mobile",
+      "@apps-in-toss/web-framework"
+    ],
+    "ui_requirements": "ScreenScaffold>Top(지출 추가)>붙여넣기 TextField multiline+Button '분석'(parseSmsText→프리필,실패 Toast)>금액 TextField inputMode numeric(에러 상태 지원)+가맹점 TextField+메모 TextField>카테고리 Chip 그룹(단일선택)>SubmitFooter>Button variant fill '저장' data-testid='save-expense-btn'(저장 중 loading). 금액≤0 시 TextField 하단 에러 '금액을 1원 이상 입력해주세요'. 저장 성공 Toast '지출이 추가되었어요'. location.state prefillText ?? null. CTA success 햅틱. Spacing 컴포넌트로만 여백. 색상 var(--tds-color-*)."
+  },
+  {
+    "id": "0008",
+    "title": "Expenses List 페이지 — /expenses",
+    "epic": "Epic 2: Pages",
+    "task": {
+      "description": "상단 Tab 기간 필터(이번 주/이번 달/전체)+기간 합계 Amount+지출 ListRow 리스트+삭제 AlertDialog 구현. 300건 초과 시 윈도잉(가상 스크롤) 적용. ListRow 탭→삭제 확인 다이얼로그, 삭제 시 deleteExpense 후 목록·합계 갱신. 빈 상태 EmptyState. location.state.added는 ?? null 확인 후 사용(진입 시 안전).",
+      "acceptance_criteria": [
+        "삭제 확인 후 목록·합계 갱신",
+        "탭 전환 시 해당 기간만 필터·합계 반영",
+        "300건 초과 시 윈도잉, state 없이 직접 진입해도 크래시 없음",
+        "data-testid='expenses-list'·컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F3-AC3",
+      "F3-AC6",
+      "F3-AC7"
+    ],
+    "files": [
+      "src/pages/Expenses.tsx"
+    ],
+    "definition_of_done": [
+      "기간 필터·합계",
+      "삭제 갱신",
+      "윈도잉",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0002",
+      "0004"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "@toss/tds-mobile"
+    ],
+    "ui_requirements": "Pattern StatusPanel. ScreenScaffold>Top(지출 내역) right=Button weak small '추가'→/add>Tab onChange=setPeriod {Tab.Item 이번 주/이번 달/전체}>Spacing12>Paragraph.Text t3 <Amount value={periodTotal} unit='원'/>>Spacing12>리스트 data-testid='expenses-list'(300건 초과 시 VirtualList 윈도잉) {ListRow contents=ListRow.Texts 2RowTypeA top=merchant bottom=`${category} · ${fmtDate}` right=<Amount unit='원'/> onClick=openDelete}>AlertDialog open={!!deleteId} title '삭제할까요?' description '이 지출 기록을 지워요.' 삭제 버튼→confirmDelete onClose→setDeleteId(null). States: Loading Skeleton3행; Empty EmptyState data-testid='expenses-empty' title '아직 지출이 없어요' description '문자를 붙여넣어 시작하세요' action 지출 추가 버튼. 왼쪽 버튼 '닫기'."
+  },
+  {
+    "id": "0009",
+    "title": "Weekly Report 페이지 — /report",
+    "epic": "Epic 2: Pages",
+    "task": {
+      "description": "주간 낭비 패턴 리포트 화면. 지출 3건 미만 시 API 미호출·안내 문구. 3건 이상 시 TossRewardAd 보상 광고 게이트 뒤에서 analyzeWeek 호출→요약(총지출/카테고리)+WasteInsight 카드 표시. 각 AI 결과 카드에 'AI가 생성한 결과입니다' Badge. 무료 사용자는 인사이트 1개+나머지 잠금 카드(구독 유도→/premium). API 에러 시 저장된 이전 리포트 유지+Toast. location.state 없이 진입해도 크래시 없음.",
+      "acceptance_criteria": [
+        "3건 미만 시 API 미호출·안내",
+        "정상 시 리워드 광고 후 요약 표시·각 카드 AI Badge",
+        "무료 시 1개+잠금 카드, 에러 시 이전 리포트 유지·Toast",
+        "state 없이 진입해도 크래시 없음·컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F4-AC1",
+      "F4-AC2",
+      "F4-AC3",
+      "F4-AC4",
+      "CP-11",
+      "CP-12"
+    ],
+    "files": [
+      "src/pages/Report.tsx"
+    ],
+    "definition_of_done": [
+      "3건 게이트",
+      "리워드 광고 후 표시",
+      "무료 잠금·에러 폴백",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0003",
+      "0004"
+    ],
+    "db_schema": "",
+    "api_contract": "POST {VITE_API_BASE}/api/analyze-week → AnalyzeWeekResponse | {error}",
+    "dependencies": [
+      "@toss/tds-mobile"
+    ],
+    "ui_requirements": "ScreenScaffold>Top(주간 리포트). TossRewardAd slotId={import.meta.env.VITE_TOSS_AD_SLOT_ID}로 결과 게이트. 요약 SummaryHero(주간 총지출)+카테고리 ListRow+MiniBar. WasteInsight 카드: ListRow.Texts title/description+savingPotential Amount, 상단 'AI가 생성한 결과입니다' Badge/Chip. 무료: insights[0]만 노출+잠금 카드(자물쇠 Asset.ContentIcon+'프리미엄으로 전체 인사이트 보기' Button→/premium). 3건 미만: EmptyState '지출이 3건 이상 필요해요'. 에러 Toast+이전 리포트 유지. 색상 var(--tds-color-*), Spacing만 여백."
+  },
+  {
+    "id": "0010",
+    "title": "Benchmark 페이지 — /benchmark",
+    "epic": "Epic 2: Pages",
+    "task": {
+      "description": "또래 익명 벤치마크(프리미엄). 무료 사용자는 잠금 화면+구독 유도(→/premium)·API 미호출. 프로필 밴드 미설정 시 안내+API 미호출. 프리미엄+밴드 설정 시 fetchBenchmark(ageBand,incomeBand,categories) 호출→saveBenchmark 저장+카테고리별 myAmount vs peerAvg MiniBar 시각화. 'AI가 생성한 결과입니다' Badge. 에러 시 마지막 저장 결과 유지+Toast. state 없이 진입해도 크래시 없음.",
+      "acceptance_criteria": [
+        "무료 시 잠금+API 미호출",
+        "프로필 미설정 시 안내+API 미호출",
+        "프리미엄 시 fetch·저장·시각화·저장 ageBand가 리터럴 유니온 값, 에러 시 마지막 결과 유지",
+        "state 없이 진입해도 크래시 없음·컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F5-AC1",
+      "F5-AC2",
+      "F5-AC3",
+      "F5-AC4",
+      "CP-11",
+      "CP-12"
+    ],
+    "files": [
+      "src/pages/Benchmark.tsx"
+    ],
+    "definition_of_done": [
+      "게이팅·프로필 가드",
+      "fetch·저장·시각화",
+      "에러 폴백",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0003",
+      "0004"
+    ],
+    "db_schema": "",
+    "api_contract": "POST {VITE_API_BASE}/api/benchmark {ageBand,incomeBand,categories} → BenchmarkResponse | {error}",
+    "dependencies": [
+      "@toss/tds-mobile"
+    ],
+    "ui_requirements": "ScreenScaffold>Top(또래 비교). 무료: 잠금 EmptyState+'프리미엄에서 또래와 비교해요' Button→/premium. 프로필 밴드 미설정: 안내 Paragraph+'프로필 설정' Button→/settings. 프리미엄: 카테고리 리스트 ListRow.Texts top=category, MiniBar 2개(myAmount/peerAvg) 또는 diffRatio Chip(+37% 등), 상단 'AI가 생성한 결과입니다' Badge. 에러 Toast+마지막 결과 유지. 색상 var(--tds-color-*), Spacing만 여백."
+  },
+  {
+    "id": "0011",
+    "title": "Challenge 페이지 — /challenge",
+    "epic": "Epic 2: Pages",
+    "task": {
+      "description": "절약 챌린지 설정·추적. 카테고리 Chip 선택+목표금액 TextField로 챌린지 생성(baselineAmount=최근 30일 실지출, 0<target<=baseline 검증). target 0/초과 시 에러·미저장, 중복 카테고리 시 Toast·미생성. 생성 시 active 카드 표시. computeProgress로 진행률/잔여 표기, recomputeChallenge로 지출 반영. 활성 챌린지 목록 ListRow+진행 바.",
+      "acceptance_criteria": [
+        "baseline200,000·target120,000 생성 시 active 카드",
+        "target 0/초과 시 에러·미저장",
+        "중복 카테고리 Toast·미생성, 진행률75%·잔여30,000 표기",
+        "컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F6-AC1",
+      "F6-AC2",
+      "F6-AC3"
+    ],
+    "files": [
+      "src/pages/Challenge.tsx"
+    ],
+    "definition_of_done": [
+      "생성·검증",
+      "중복 방지",
+      "진행률 표기",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0003",
+      "0004"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "@toss/tds-mobile",
+      "@apps-in-toss/web-framework"
+    ],
+    "ui_requirements": "ScreenScaffold>Top(절약 챌린지). 생성 폼: 카테고리 Chip 그룹+목표금액 TextField(inputMode numeric,에러 상태)+baseline Paragraph 안내+SubmitFooter Button '챌린지 시작'. 검증: target≤0 또는 target>baseline 시 에러 '목표는 1원~기준액 사이로 정해주세요'·미저장; 이미 active 카테고리면 Toast '이미 진행 중인 카테고리예요'. 활성 목록: ListRow.Texts top=category bottom=`${currentSpent}/${targetAmount}` + MiniBar(percent) + 잔여 Amount. status별 Chip(진행중/완료/실패). CTA success 햅틱. Spacing만 여백, 색상 var(--tds-color-*)."
+  },
+  {
+    "id": "0012",
+    "title": "Premium 페이지 — /premium",
+    "epic": "Epic 2: Pages",
+    "task": {
+      "description": "프리미엄 구독 화면. 템플릿 TossPurchase 컴포넌트(sku={import.meta.env.VITE_TOSS_IAP_SKU})로 결제. 결제 성공 시 processProductGrant/onPurchased에서 patchProfile(isPremium:true, premiumUntil=now+30일)+Toast+navigate. 결제 취소 시 프로필 불변+Toast. 이미 프리미엄이면 상태 카드 표시+결제 버튼 숨김. 결제 중 loading. location.state.from은 ?? null 폴백.",
+      "acceptance_criteria": [
+        "결제 성공 시 프리미엄 저장·토스트·이동",
+        "취소 시 불변·토스트",
+        "활성 시 상태 카드·버튼 숨김, 결제 중 loading",
+        "state 없이 진입해도 크래시 없음(from 폴백)·data-testid='premium-cta'·컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F7-AC1",
+      "F7-AC2",
+      "F7-AC3",
+      "CP-12"
+    ],
+    "files": [
+      "src/pages/Premium.tsx"
+    ],
+    "definition_of_done": [
+      "결제 성공/취소 처리",
+      "활성 상태 UI",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0004"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "@toss/tds-mobile",
+      "@apps-in-toss/web-framework"
+    ],
+    "ui_requirements": "ScreenScaffold>Top(프리미엄). 혜택 리스트 ListRow(심층 리포트/또래 벤치마크/PDF)+가격 SummaryHero. 무료: TossPurchase sku={import.meta.env.VITE_TOSS_IAP_SKU} processProductGrant/onPurchased로 patchProfile(isPremium true,premiumUntil now+30일), CTA data-testid='premium-cta'(결제 중 loading). 성공 Toast '프리미엄이 시작됐어요'+navigate(from ?? '/'). 취소 Toast '결제를 취소했어요'. 이미 프리미엄: 상태 카드 '프리미엄 이용 중'+만료일, 결제 버튼 숨김. success 햅틱. 색상 var(--tds-color-*), Spacing만 여백."
+  },
+  {
+    "id": "0013",
+    "title": "Settings 페이지 — /settings",
+    "epic": "Epic 2: Pages",
+    "task": {
+      "description": "설정 화면: 프로필(연령/소득대) 표시·수정, 프리미엄 상태, 월간 PDF 리포트 내보내기(window.print), AI 고지 재확인 항목. PDF는 프리미엄+리포트 존재 시에만 window.print 호출, 인쇄 뷰에 'AI가 생성한 결과입니다' 라벨 포함. 리포트 없으면 Toast·인쇄 미실행. window.open/외부 href 사용 금지(CP-7).",
+      "acceptance_criteria": [
+        "리포트 없을 때 PDF 시도 시 Toast·인쇄 미실행",
+        "프리미엄+리포트 존재 시 window.print 호출·인쇄 뷰 AI 라벨 포함",
+        "window.open/외부 href 미사용",
+        "컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F8-AC2",
+      "F8-AC3",
+      "CP-7",
+      "CP-11"
+    ],
+    "files": [
+      "src/pages/Settings.tsx"
+    ],
+    "definition_of_done": [
+      "PDF 게이트·인쇄",
+      "외부 이동 미사용",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0003",
+      "0004"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "@toss/tds-mobile"
+    ],
+    "ui_requirements": "ScreenScaffold>Top(설정). ListRow 그룹: 프로필(연령대/소득대 표시, 탭 시 Chip 수정 BottomSheet), 프리미엄 상태 ListRow(무료면 '프리미엄 보기'→/premium), 'PDF 리포트 저장' ListRow(프리미엄+리포트 있을 때만 활성, window.print 호출; 없으면 Toast '저장할 리포트가 없어요'), 'AI 활용 안내 다시 보기' ListRow. 인쇄 뷰에 'AI가 생성한 결과입니다' 라벨 필수. 외부 링크/설치 유도 금지. Spacing만 여백, 색상 var(--tds-color-*)."
+  },
+  {
+    "id": "0014",
+    "title": "라우터 배선 + 온보딩 가드 + FloatingTabBar",
+    "epic": "4",
+    "task": {
+      "description": "App.tsx에서 React Router로 9개 경로(/, /onboarding, /add, /expenses, /report, /benchmark, /challenge, /premium, /settings)를 연결하고 전역 store Provider를 배선한다. onboarded:false면 온보딩 외 경로 진입 시 <Navigate to='/onboarding'> 리다이렉트하는 가드를 둔다. 템플릿 FloatingTabBar(홈/내역/리포트/설정)를 전역 배치하고 활성 탭 틴트 적용. App.tsx는 전체에서 이 패킷만 소유(main.tsx 수정 금지).",
+      "acceptance_criteria": [
+        "onboarded:false로 /report 직접 진입 시 /onboarding 리다이렉트",
+        "온보딩 완료 후 탭 네비 정상",
+        "새로고침·직접 링크 진입 시 어느 경로도 크래시 없음",
+        "컴파일 통과"
+      ]
+    },
+    "covers": [
+      "F8-AC1",
+      "CP-5",
+      "CP-6"
+    ],
+    "files": [
+      "src/App.tsx",
+      "src/components/RouteGuard.tsx"
+    ],
+    "definition_of_done": [
+      "9개 라우트 연결·가드",
+      "FloatingTabBar 배치",
+      "크래시 없음",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0005",
+      "0006",
+      "0007",
+      "0008",
+      "0009",
+      "0010",
+      "0011",
+      "0012",
+      "0013"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "react-router-dom",
+      "@toss/tds-mobile",
+      "@apps-in-toss/web-framework"
+    ],
+    "ui_requirements": "App.tsx: <AppStoreProvider><BrowserRouter><Routes> 9경로 <RouteGuard>로 감싸 onboarded 체크. 하단 template FloatingTabBar(홈/내역/리포트/설정, 활성=컬러 틴트, 탭 전환 tickWeak). position fixed 하단 요소 paddingBottom calc(Npx+env(safe-area-inset-bottom)). main.tsx @AI:ANCHOR 수정 금지."
+  },
+  {
+    "id": "0015",
+    "title": "AI 최초 이용 고지 게이트 + 전역 검수 스윕",
+    "epic": "Epic 3: Integration",
+    "task": {
+      "description": "AI 기능(리포트/벤치마크) 최초 사용 시 생성형 AI 활용 고지 AlertDialog를 1회 표시하고 확인 시 patchProfile(aiNoticeAcknowledged:true)로 재표시 방지하는 재사용 컴포넌트/훅을 만든다. 전역 검수 스윕: 외부 URL 이동·설치 유도 문구·외부 로깅·HEX 리터럴 0개 확인, vite build 후 console.error/CORS 에러 0개 확인. App.tsx/main.tsx는 수정하지 않는다.",
+      "acceptance_criteria": [
+        "최초 리포트/벤치마크 사용 시 다이얼로그 1회",
+        "확인 후 재사용 시 미표시(localStorage 반영)",
+        "외부 이동·설치 유도·외부 로깅·HEX 리터럴 0개, vite build 콘솔/CORS 에러 0개",
+        "컴파일 통과"
+      ]
+    },
+    "covers": [
+      "CP-7",
+      "CP-8",
+      "CP-9",
+      "CP-11",
+      "GC-2"
+    ],
+    "files": [
+      "src/components/AINoticeGate.tsx",
+      "src/hooks/useAiNotice.ts"
+    ],
+    "definition_of_done": [
+      "AI 고지 1회 게이트",
+      "검수 스윕 통과",
+      "tsc 통과"
+    ],
+    "depends_on": [
+      "0004"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "@toss/tds-mobile"
+    ],
+    "ui_requirements": "AINoticeGate: useAiNotice()가 aiNoticeAcknowledged 반환. 미확인 상태에서 children(AI 기능) 최초 진입 시 AlertDialog title 'AI 활용 안내' description '이 서비스는 생성형 AI로 소비 진단 결과를 제공해요. 결과는 참고용이에요.' 확인 버튼→patchProfile(aiNoticeAcknowledged:true). Report/Benchmark 페이지가 이 게이트를 감싸 사용. 색상 var(--tds-color-*)."
+  }
+]
