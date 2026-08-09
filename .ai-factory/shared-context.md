@@ -265,3 +265,4 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0003: Reports/Benchmark/Challenges storage + Challenge 도메인 (files: src/lib/storage/reports.ts, src/lib/storage/benchmark.ts, src/lib/storage/challenges.ts, src/lib/domain/challenge.ts)
 - 0004: SMS 파서 + API client + State store + 통화 포맷 (files: src/lib/domain/smsParser.ts, src/lib/api/client.ts, src/lib/store.tsx, src/lib/format.ts)
 - 0005: Onboarding 페이지 — /onboarding (files: src/pages/Onboarding.tsx)
+- 0006: Home Dashboard 페이지 — / (files: src/pages/Home.tsx)
